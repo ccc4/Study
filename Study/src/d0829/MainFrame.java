@@ -1,31 +1,43 @@
 package d0829;
 
 import java.awt.BorderLayout;
+import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.datatransfer.UnsupportedFlavorException;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetAdapter;
+import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.List;
 
 import javax.swing.JButton;
-import javax.swing.JDialog;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
-
-import d0822.DataItem;
 
 public class MainFrame extends JFrame {
 	
@@ -49,10 +61,15 @@ public class MainFrame extends JFrame {
 	JTextArea contentArea;
 	JScrollPane contentAreaPanel;
 	
+//	JButton sendImgBtn;
+	JButton sendFileBtn;
+	JPanel sendEtcPanel;
 	JTextArea sendMsgArea;
 	JScrollPane sendMsgPanel;
 	JButton sendMsgBtn;
 	JPanel sendPanel;
+	
+	DropTarget dt;
 	
 	// -------------------------------------------
 	
@@ -132,10 +149,16 @@ public class MainFrame extends JFrame {
 			contentArea = new JTextArea();
 			contentAreaPanel = new JScrollPane(contentArea);
 			
+//			sendImgBtn = new JButton("IMG");
+			sendFileBtn = new JButton("FILE");
+			sendEtcPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+//			sendEtcPanel.add(sendImgBtn);
+			sendEtcPanel.add(sendFileBtn);
 			sendMsgArea = new JTextArea(3, 1);
 			sendMsgPanel = new JScrollPane(sendMsgArea);
 			sendMsgBtn = new JButton("SEND");
 			sendPanel = new JPanel(new BorderLayout());
+			sendPanel.add(sendEtcPanel, BorderLayout.NORTH);
 			sendPanel.add(sendMsgPanel, BorderLayout.CENTER);
 			sendPanel.add(sendMsgBtn, BorderLayout.EAST);
 			
@@ -161,8 +184,11 @@ public class MainFrame extends JFrame {
 			startBtn.addActionListener(new btnAction(1));
 			stopBtn.addActionListener(new btnAction(0));
 			sendMsgBtn.addActionListener(new btnAction(0));
+			sendFileBtn.addActionListener(new btnAction(0));
 			
-			Thread inputMsgThread = new ThreadControl();
+			dt = new DropTarget(sendMsgArea, DnDConstants.ACTION_COPY_OR_MOVE, new DtClass(), true, null);
+			
+			inputMsgThread = new ThreadControl();
 			inputMsgThread.start();
 		}
 	}
@@ -197,10 +223,16 @@ public class MainFrame extends JFrame {
 			contentArea = new JTextArea();
 			contentAreaPanel = new JScrollPane(contentArea);
 			
+//			sendImgBtn = new JButton("IMG");
+			sendFileBtn = new JButton("FILE");
+			sendEtcPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+//			sendEtcPanel.add(sendImgBtn);
+			sendEtcPanel.add(sendFileBtn);
 			sendMsgArea = new JTextArea(3, 1);
 			sendMsgPanel = new JScrollPane(sendMsgArea);
 			sendMsgBtn = new JButton("SEND");
 			sendPanel = new JPanel(new BorderLayout());
+			sendPanel.add(sendEtcPanel, BorderLayout.NORTH);
 			sendPanel.add(sendMsgPanel, BorderLayout.CENTER);
 			sendPanel.add(sendMsgBtn, BorderLayout.EAST);
 			
@@ -226,8 +258,11 @@ public class MainFrame extends JFrame {
 			startBtn.addActionListener(new btnAction(2));
 			stopBtn.addActionListener(new btnAction(0));
 			sendMsgBtn.addActionListener(new btnAction(0));
+			sendFileBtn.addActionListener(new btnAction(0));
 			
-			Thread inputMsgThread = new ThreadControl();
+			dt = new DropTarget(sendMsgArea, DnDConstants.ACTION_COPY_OR_MOVE, new DtClass(), true, null);
+			
+			inputMsgThread = new ThreadControl();
 			inputMsgThread.start();
 		}
 	}
@@ -255,10 +290,10 @@ public class MainFrame extends JFrame {
 								int port = Integer.parseInt(portTextField.getText());
 								server = new ServerSocket(port);
 								
-								contentArea.append("Server Activated...\n");
-								contentArea.append("Connection ...\n");
+								contentArea.append("===============Server Activated...\n");
+								contentArea.append("===============Connection ...\n");
 								client = server.accept();
-								contentArea.append("Connection Success!\n");
+								contentArea.append("===============Connection Success!\n");
 								
 								out = new ObjectOutputStream(new BufferedOutputStream(client.getOutputStream()));
 								out.flush();
@@ -280,8 +315,9 @@ public class MainFrame extends JFrame {
 							try {
 								String ip = addressField.getText();
 								int port = Integer.parseInt(portTextField.getText());
+								contentArea.append("===============Connection ...\n");
 								client = new Socket(ip, port);
-								contentArea.append("Connection Success!\n");
+								contentArea.append("===============Connection Success!\n");
 								
 								in = new ObjectInputStream(new BufferedInputStream(client.getInputStream()));
 								out = new ObjectOutputStream(new BufferedOutputStream(client.getOutputStream()));
@@ -314,8 +350,78 @@ public class MainFrame extends JFrame {
 				} catch (IOException e1) {
 					System.out.println("sendMsgBtn Error");
 				}
+			} else if(what.equals("FILE")) {
+				JFileChooser chooser = new JFileChooser();
+				int ret = chooser.showOpenDialog(null);
+				if(ret != JFileChooser.APPROVE_OPTION) {
+					JOptionPane.showMessageDialog(null, 
+							"파일을 선택하지 않았습니다", 
+							"경고", JOptionPane.WARNING_MESSAGE);
+					return;
+				}
+				
+				File file = new File(chooser.getSelectedFile().getPath());
+				DataItem data = new DataItem();
+				byte[] contents = new byte[(int) file.length()];
+				
+				try(BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
+					bis.read(contents);
+					
+					data.setFileName(file.getName());
+					data.setFileContents(contents);
+					out.writeObject(data);
+					out.flush();
+					
+					contentArea.append(data.getFileName() + " - 파일보냄.\n");
+					
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+				
 			}
 			
+		}
+		
+	}
+	
+	class DtClass extends DropTargetAdapter {
+
+		@Override
+		public void drop(DropTargetDropEvent dtde) {
+				dtde.acceptDrop(dtde.getDropAction());
+				Transferable tf = dtde.getTransferable();
+				try {
+				List list = (List) tf.getTransferData(DataFlavor.javaFileListFlavor);
+				File targetFIle = (File) list.get(0);
+				int ret = JOptionPane.showConfirmDialog(null, "파일을 보내시겠습니까?.\n", "파일 송신", JOptionPane.YES_NO_OPTION);
+				if(ret != JOptionPane.YES_OPTION) {
+					return;
+				} else {
+					String targetFilePath = targetFIle.getAbsolutePath();
+					File file = new File(targetFilePath);
+					DataItem data = new DataItem();
+					byte[] contents = new byte[(int) file.length()];
+					
+					try(BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
+						bis.read(contents);
+						
+						data.setFileName(file.getName());
+						data.setFileContents(contents);
+						out.writeObject(data);
+						out.flush();
+						
+						contentArea.append(data.getFileName() + " - 파일보냄.\n");
+						
+					} catch (IOException e1) {
+						e1.printStackTrace();
+					}
+				}
+				
+			} catch (UnsupportedFlavorException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 		
 	}
@@ -339,6 +445,22 @@ public class MainFrame extends JFrame {
 					int type =  data.getDataType();
 					if(type == DataItem.TYPE_MESSAGE) {
 						contentArea.append("R: " + data.getMessage() + "\n");
+					} else if(type == DataItem.TYPE_FILE) {
+						int ret = JOptionPane.showConfirmDialog(null, "상대방이 파일을 보냈습니다.\n받으시겠습니까?", "파일 수신", JOptionPane.YES_NO_OPTION);
+						if(ret != JOptionPane.YES_OPTION) {
+							contentArea.append("파일수신을 거부하였습니다.\n");
+						} else {
+							
+							File dir = new File(".\\Downloads");
+							if(!dir.exists()) dir.mkdirs();
+							File file = new File(dir, data.getFileName());
+							
+							BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file));
+							bos.write(data.getFileContents());
+							bos.flush();
+							bos.close();
+							contentArea.append(data.getFileName() + " - 수신완료!\n");
+						}
 					}
 					
 					
@@ -377,7 +499,7 @@ public class MainFrame extends JFrame {
 		sendMsgBtn.setEnabled(true);
 	}
 	public void enableControl_stopBtn() {
-		contentArea.append("---종료---\n");
+		contentArea.append("===============Disconnect\n");
 		startBtn.setEnabled(true);
 		stopBtn.setEnabled(false);
 		sendMsgBtn.setEnabled(false);
