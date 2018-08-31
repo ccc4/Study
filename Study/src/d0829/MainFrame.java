@@ -20,7 +20,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -41,10 +40,16 @@ import javax.swing.WindowConstants;
 
 public class MainFrame extends JFrame {
 	
+	String nickname;
+	
+	// 시작
+	JLabel nicknameLable = new JLabel("닉네임");
+	JTextField nicknameField = new JTextField();
 	JButton selectServer = new JButton("서버");
 	JButton selectClient = new JButton("클라");
+	JPanel mainPanel = new JPanel(new GridLayout(2, 2));
 	
-	
+	// 각 서버, 클라이언트 UI
 	JLabel addressLabel;
 	JTextField addressField;
 	JLabel portLabel;
@@ -83,13 +88,14 @@ public class MainFrame extends JFrame {
 	public MainFrame() {
 		super("메인");
 		
+		mainPanel.add(nicknameLable);
+		mainPanel.add(nicknameField);
+		mainPanel.add(selectServer);
+		mainPanel.add(selectClient);
+		this.add(mainPanel);
+		nicknameLable.setHorizontalAlignment(SwingConstants.CENTER);
 		
-		this.setLayout(new GridLayout(1, 2));
-		this.add(selectServer);
-		this.add(selectClient);
-		
-		
-		this.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE); // 닫기 버튼 비활성화
+//		this.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE); // 닫기 버튼 비활성화
 		setSize(150, 100);
 		setResizable(false);
 		setLocationRelativeTo(null);
@@ -100,6 +106,11 @@ public class MainFrame extends JFrame {
 			
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				nickname = nicknameField.getText().trim();
+				if(nickname.length() == 0) {
+					JOptionPane.showMessageDialog(null, "닉네임을 입력해주십시오.", "닉네임 미입력", JOptionPane.WARNING_MESSAGE);
+					return;
+				}
 				ServerFrame serverFrame = new ServerFrame("서버 애플리케이션");
 				setVisible(false);
 			}
@@ -109,6 +120,11 @@ public class MainFrame extends JFrame {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				nickname = nicknameField.getText().trim();
+				if(nickname.length() == 0) {
+					JOptionPane.showMessageDialog(null, "닉네임을 입력해주십시오.", "닉네임 미입력", JOptionPane.WARNING_MESSAGE);
+					return;
+				}
 				ClientFrame clientFrame = new ClientFrame("클라이언트 애플리케이션");
 				setVisible(false);
 			}
@@ -130,7 +146,9 @@ public class MainFrame extends JFrame {
 			addressLabel = new JLabel("My IP");
 			portLabel = new JLabel("PORT");
 			portTextField = new JTextField("5070");
-			inputAddressPanel = new JPanel(new GridLayout(2, 2));
+			inputAddressPanel = new JPanel(new GridLayout(3, 2));
+			inputAddressPanel.add(nicknameLable);
+			inputAddressPanel.add(nicknameField);
 			inputAddressPanel.add(addressLabel);
 			inputAddressPanel.add(addressField);
 			inputAddressPanel.add(portLabel);
@@ -170,6 +188,7 @@ public class MainFrame extends JFrame {
 			
 			addressLabel.setHorizontalAlignment(SwingConstants.CENTER);
 			portLabel.setHorizontalAlignment(SwingConstants.CENTER);
+			nicknameField.setEditable(false);
 			addressField.setEditable(false);
 			contentArea.setEditable(false);
 			stopBtn.setEnabled(false);
@@ -204,7 +223,9 @@ public class MainFrame extends JFrame {
 			addressField = new JTextField("localhost");
 			portLabel = new JLabel("PORT");
 			portTextField = new JTextField("5070");
-			inputAddressPanel = new JPanel(new GridLayout(2, 2));
+			inputAddressPanel = new JPanel(new GridLayout(3, 2));
+			inputAddressPanel.add(nicknameLable);
+			inputAddressPanel.add(nicknameField);
 			inputAddressPanel.add(addressLabel);
 			inputAddressPanel.add(addressField);
 			inputAddressPanel.add(portLabel);
@@ -244,6 +265,7 @@ public class MainFrame extends JFrame {
 			
 			addressLabel.setHorizontalAlignment(SwingConstants.CENTER);
 			portLabel.setHorizontalAlignment(SwingConstants.CENTER);
+			nicknameField.setEditable(false);
 			contentArea.setEditable(false);
 			stopBtn.setEnabled(false);
 			sendMsgBtn.setEnabled(false);
@@ -321,6 +343,9 @@ public class MainFrame extends JFrame {
 								
 								in = new ObjectInputStream(new BufferedInputStream(client.getInputStream()));
 								out = new ObjectOutputStream(new BufferedOutputStream(client.getOutputStream()));
+								DataItem data = new DataItem();
+								data.setNickname(nickname);
+								out.writeObject(data);
 								out.flush();
 								
 							} catch (IOException e) {
@@ -339,9 +364,10 @@ public class MainFrame extends JFrame {
 				String msg = sendMsgArea.getText().trim();
 				if(msg.length() == 0) return;
 				sendMsgArea.setText("");
-				contentArea.append("S: " + msg + "\n");
+				contentArea.append(nickname + ": " + msg + "\n");
 				
 				DataItem data = new DataItem();
+				data.setNickname(nickname);
 				data.setMessage(msg);
 				try {
 					out.writeObject(data);
@@ -367,6 +393,7 @@ public class MainFrame extends JFrame {
 				try(BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
 					bis.read(contents);
 					
+					data.setNickname(nickname);
 					data.setFileName(file.getName());
 					data.setFileContents(contents);
 					out.writeObject(data);
@@ -405,6 +432,7 @@ public class MainFrame extends JFrame {
 					try(BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
 						bis.read(contents);
 						
+						data.setNickname(nickname);
 						data.setFileName(file.getName());
 						data.setFileContents(contents);
 						out.writeObject(data);
@@ -439,14 +467,18 @@ public class MainFrame extends JFrame {
 			}
 			
 			DataItem data;
+			String sender = "";
 			while(true) {
 				try {
 					data = (DataItem) in.readObject();
+					sender = data.getNickname();
 					int type =  data.getDataType();
-					if(type == DataItem.TYPE_MESSAGE) {
-						contentArea.append("R: " + data.getMessage() + "\n");
+					if(type == DataItem.TYPE_JOIN) {
+						contentArea.append(sender + " 님이 입장하셨습니다.\n");
+					} else if(type == DataItem.TYPE_MESSAGE) {
+						contentArea.append(sender + ": " + data.getMessage() + "\n");
 					} else if(type == DataItem.TYPE_FILE) {
-						int ret = JOptionPane.showConfirmDialog(null, "상대방이 파일을 보냈습니다.\n받으시겠습니까?", "파일 수신", JOptionPane.YES_NO_OPTION);
+						int ret = JOptionPane.showConfirmDialog(null, sender + " 님이 파일을 보냈습니다.\n받으시겠습니까?", "파일 수신", JOptionPane.YES_NO_OPTION);
 						if(ret != JOptionPane.YES_OPTION) {
 							contentArea.append("파일수신을 거부하였습니다.\n");
 						} else {
@@ -465,6 +497,7 @@ public class MainFrame extends JFrame {
 					
 					
 				} catch (Exception e) {
+					contentArea.append(sender + " 님이 퇴장하셨습니다.\n");
 					break;
 				}
 			}
